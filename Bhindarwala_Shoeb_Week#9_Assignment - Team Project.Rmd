@@ -1,0 +1,99 @@
+---
+title: "Week7_Assignment7-Team_Project"
+author: "Anand Kaluvakolli"
+date: "Sep 3, 2017"
+output: html_document
+---
+#### Set up install packages
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("stringi")
+library(stringr)
+library(Hmisc)
+library("sqldf")
+```
+
+#### Read in the dirty data
+```{r}
+dirtydata <- read.csv(file="C:\\Users\\E5440\\Desktop\\CPT\\Class\\LateSummer2017\\510-51\\Assignment7\\Dirty_data.csv", header=TRUE)
+
+```
+#### Remove html column
+
+```{r}
+dirtydata$Strange.HTML<-NULL
+```
+
+
+#### Remove the special characters, leading spaces and capitalize the street names for street2 and street
+```{r}
+dirtydata$street2<-gsub( "[[:punct:]]"," ",dirtydata$Street.2)
+dirtydata$street2<-gsub("\\s+", " ",str_trim(dirtydata$street2))
+dirtydata$street2<-stri_trans_general(dirtydata$street2,id="Title")
+
+
+dirtydata$street<-iconv(dirtydata$street,to="ASCII//TRANSLIT")
+dirtydata$street<-gsub( "[[:punct:]]"," ",dirtydata$street)
+dirtydata$street<-trimws(dirtydata$street)
+dirtydata$street<-stri_trans_general(dirtydata$street,id="Title")
+summary(dirtydata)
+```
+
+#### Abbreviation
+```{r}
+invisible(stri_replace_first_regex(dirtydata$street,
+pattern= c("Road", "Roads","Avenue","St","Lane"), replacement=c("Rd.","Ave","St.","Rds.","Ln")))
+
+invisible(stri_replace_first_regex(dirtydata$street2,
+pattern= c("Road", "Roads","Avenue","St","Lane"), replacement=c("Rd.","Ave","St.","Rds.","Ln")))
+```
+
+
+
+#### Fill the area
+```{r}
+ddata<-data.frame(dirtydata$Year, dirtydata$Area,dirtydata$street2,dirtydata$street)
+names(ddata)<-c("year","area","street2","street")
+summary(ddata)
+
+cdata<-sqldf("SELECT year, area, street, street2,
+                   CASE
+                   WHEN (street2 LIKE '%Birmingham%' or street2 LIKE '%Acocks%') THEN 'Birmingham' 
+WHEN street2 LIKE '%Coventry%' THEN 'Coventry' 
+WHEN street2 LIKE '%Dudley%' THEN 'Dudley' 
+WHEN street2 LIKE '%Sandwell%' THEN 'Sandwell' 
+WHEN street2 LIKE '%Solihull%' THEN 'Solihull' 
+WHEN street2 LIKE '%Walsall%' THEN 'Walsall' 
+WHEN street2 LIKE '%Wolverhampton%' THEN 'Wolverhampton' 
+else 'A' 
+END area1 
+FROM ddata") 
+
+```
+
+#### Remove the identical column for street and street2
+
+```{r}
+cdata1 <- sqldf("SELECT year, area, area1,street, street2,
+                CASE WHEN street=street2 then '1' else '0' 
+                END AS equal
+                FROM cdata")
+
+cdata2 <- sqldf("SELECT year, area, area1,street, street2,equal,
+                CASE WHEN equal='1' then ' ' else street2 
+                END AS street22
+                FROM cdata1")
+
+```
+
+#### Final clean data
+
+```{r}
+cleandata <- data.frame(cdata2$year, cdata2$area1, cdata2$street, cdata2$street22 )
+
+write.csv(cleandata, file="C:\\Users\\E5440\\Desktop\\CPT\\Class\\LateSummer2017\\510-51\\Assignment7\\Clean_data.csv")
+summary(cleandata)
+```
